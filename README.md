@@ -1,161 +1,241 @@
 # oh-my-harness
 
-프로젝트 맞춤형 에이전트 팀을 자동 구축하는 Claude Code 플러그인.
+**Say "harness", get a team.** One command turns Claude Code into a coordinated multi-agent engineering team.
 
-"하네스 만들어줘"라고 말하면, 프로젝트를 분석하고 코어 6 에이전트를 포함한 에이전트 팀을 자동으로 생성합니다.
+```
+> harness build for my NestJS project
 
-## 배경
+Analyzing project... NestJS + DDD/Hexagonal detected.
 
-Claude Code에서 복잡한 프로젝트를 다룰 때, 설계·구현·테스트·리뷰·보안·디버깅을 한 에이전트가 모두 처리하면 컨텍스트가 비대해지고 품질이 떨어집니다.
+ # Agent              Role              Model
+ 1 architect          Design & Analysis  Opus
+ 2 test-engineer      TDD Tests          Codex
+ 3 executor           Implementation     Codex
+ 4 code-reviewer      Code Review        Opus
+ 5 security-reviewer  Security Audit     Opus
+ 6 debugger           Root Cause Fix     Codex
+ + domain-expert      DDD Validation     Opus  (auto-generated)
 
-**oh-my-harness**는 이 문제를 해결합니다:
-- 역할별 전문 에이전트를 자동 생성하여 **관심사를 분리**합니다
-- 에이전트별로 **Claude(opus) 또는 Codex CLI(gpt-5.4)** 중 적합한 모델을 선택할 수 있습니다
-- 프로젝트 특성을 분석해 **추가 에이전트와 오케스트레이터**를 자동으로 생성합니다
+Harness ready. Ask me anything.
+```
 
-## 설치
+## Why
 
-### 사전 요구사항
+Claude Code is powerful, but one agent doing design, implementation, testing, review, security, and debugging at once leads to bloated context and inconsistent quality.
 
-- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) 설치
-- [Codex CLI](https://github.com/openai/codex) 설치 (선택 — 없으면 Claude로 대체)
+**oh-my-harness** fixes this:
 
-### GitHub에서 설치
+- **Separation of concerns** — each agent has a single responsibility and enforced boundaries
+- **Multi-model orchestration** — Claude Opus for reasoning, Codex (GPT-5.4) for coding, or your own choice
+- **Project-aware generation** — analyzes your stack and auto-generates additional agents (e.g., `domain-expert` for DDD projects)
+- **One-time setup, persistent team** — harness config lives in `.claude/`, survives across sessions
+
+## Agents
+
+oh-my-harness creates 6 core agents, each with distinct permissions and specialization:
+
+### architect
+
+> *"Every claim must be traceable to specific code."*
+
+The strategic advisor. Analyzes architecture, diagnoses root causes, and provides DDD/Hexagonal guidance. **READ-ONLY** — never touches your code, only reads and recommends with `file:line` evidence.
+
+- Evaluates domain layer purity, port/adapter boundaries, aggregate consistency
+- 3-failure circuit breaker: if 3+ fix attempts fail, questions the architecture instead of trying variations
+- **Model: Opus** (deep reasoning)
+
+### test-engineer
+
+> *"No production code without a failing test first."*
+
+The TDD enforcer. Writes failing tests *before* any implementation exists. Tests become the executable specification that the executor must satisfy.
+
+- RED phase specialist — writes tests, runs them, confirms they all FAIL
+- One test per behavior, descriptive names: `"returns empty array when no users match filter"`
+- **Model: Codex** (code generation)
+
+### executor
+
+> *"A small correct change beats a large clever one."*
+
+The implementer. Writes the minimum code to pass tests. No over-engineering, no scope creep, no "while I'm here" refactors.
+
+- Classifies tasks as Trivial / Scoped / Complex, adjusts effort accordingly
+- Matches existing codebase patterns (naming, error handling, imports)
+- Runs build + test verification before claiming completion
+- **Model: Codex** (code generation)
+
+### code-reviewer
+
+> *"Spec compliance first, style nitpicks second."*
+
+The quality gate. Performs severity-rated review (CRITICAL / HIGH / MEDIUM / LOW) with concrete fix suggestions. Checks spec compliance *before* code quality.
+
+- Evaluates logic correctness, SOLID principles, error handling, anti-patterns
+- Clear verdicts: APPROVE, REQUEST CHANGES, or COMMENT
+- Also notes positive observations to reinforce good practices
+- **READ-ONLY** | **Model: Opus** (deep reasoning)
+
+### security-reviewer
+
+> *"One vulnerability can cause real financial losses."*
+
+The security specialist. Evaluates all OWASP Top 10 categories, scans for hardcoded secrets, and audits dependencies.
+
+- Prioritizes by: severity x exploitability x blast radius
+- Provides secure code examples in the same language
+- Covers: injection, auth/authz, XSS, SSRF, sensitive data exposure
+- **READ-ONLY** | **Model: Opus** (deep reasoning)
+
+### debugger
+
+> *"Fix the root cause, not the symptom."*
+
+The minimal-fix specialist. Traces bugs to their root cause and applies the smallest possible change.
+
+- Reproduces before investigating, reads error messages completely
+- One hypothesis at a time, one fix at a time (< 5% of affected file)
+- 3-failure circuit breaker: after 3 failed hypotheses, escalates instead of guessing
+- **Model: Codex** (code generation)
+
+### Auto-generated agents
+
+Beyond the core 6, harness analyzes your project and creates additional agents as needed:
+
+| Condition | Agent | Role |
+|-----------|-------|------|
+| 5+ modules | `planner` | Task decomposition & planning |
+| Complex requirements | `analyst` | Requirements & gap analysis |
+| Multi-agent output | `critic` | Cross-validation & quality gates |
+| Frontend included | `ui-reviewer` | UI/UX review |
+| DDD/Hexagonal project | `domain-expert` | Domain model validation |
+
+## How it works
+
+```
+User: "harness"
+  |
+  v
+[1] Keyword Detection
+    UserPromptSubmit hook detects "harness" keyword
+  |
+  v
+[2] Project Analysis
+    Scans tech stack, directory structure, existing patterns
+    Detects NestJS/DDD/Hexagonal automatically
+  |
+  v
+[3] Model Selection
+    User picks model per agent (Opus / Sonnet / Codex / Custom)
+  |
+  v
+[4] Agent Team Generation
+    Core 6 + auto-generated agents -> .claude/agents/
+    Orchestrator skill -> .claude/skills/
+    Harness context -> CLAUDE.md
+  |
+  v
+[5] Ready
+    "API endpoints for UserService" -> orchestrator routes to
+    architect -> test-engineer -> executor -> code-reviewer -> security-reviewer
+```
+
+### Output structure
+
+```
+your-project/
+├── .claude/
+│   ├── agents/
+│   │   ├── architect.md
+│   │   ├── test-engineer.md
+│   │   ├── executor.md
+│   │   ├── code-reviewer.md
+│   │   ├── security-reviewer.md
+│   │   ├── debugger.md
+│   │   └── {auto-generated}.md
+│   └── skills/
+│       └── {orchestrator}/
+│           └── SKILL.md
+└── CLAUDE.md  # harness context registered
+```
+
+## Installation
+
+### Prerequisites
+
+- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
+- [Codex CLI](https://github.com/openai/codex) (optional — falls back to Claude Sonnet if not installed)
+
+### From GitHub
 
 ```bash
 /plugin marketplace add MoonDongmin/oh-my-harness
 /plugin install oh-my-harness
 ```
 
-### 로컬 설치 (개발용)
+### Local (development)
 
 ```bash
 git clone https://github.com/MoonDongmin/oh-my-harness.git
 cd oh-my-harness
 bun install
 
-# Claude Code에서 플러그인 설치
+# Install plugin in Claude Code
 claude plugins:install /path/to/oh-my-harness
 ```
 
-## 사용법
+## Usage
 
-### 하네스 만들기
+### Build a harness
 
-플러그인 설치 후, **아무 프로젝트에서** Claude Code를 열고 다음 중 하나를 입력합니다:
-
-```
-하네스 만들어줘                    # 한국어 키워드
-/oh-my-harness:harness            # 슬래시 커맨드
-```
-
-기능과 함께 호출하면 하네스 빌드 후 바로 작업을 시작합니다:
+Open Claude Code in **any project** and type:
 
 ```
-/oh-my-harness:harness UserService CRUD 만들어줘
+harness                                          # Korean/English keyword
+/oh-my-harness:harness                           # slash command
+/oh-my-harness:harness UserService CRUD          # build + start working
 ```
 
-### 검증하기
-
-변경사항이 실제로 동작하는지 테스트·빌드·타입체크로 검증합니다:
+### Verify changes
 
 ```
-검증해줘
-/oh-my-harness:verify
+verify                                           # keyword
+/oh-my-harness:verify                            # slash command
 ```
 
-### 전체 커맨드
+### All commands
 
-| 커맨드 | 설명 |
-|--------|------|
-| `/oh-my-harness:harness` | 프로젝트 에이전트 팀 구축 |
-| `/oh-my-harness:verify` | 변경사항 동작 검증 |
-| `/oh-my-harness:help` | 도움말 표시 |
+| Command | Description |
+|---------|-------------|
+| `/oh-my-harness:harness` | Build agent team for project |
+| `/oh-my-harness:verify` | Verify changes (test, build, typecheck) |
+| `/oh-my-harness:help` | Show help |
 
-### 한국어 키워드
+### Korean keywords
 
-| 키워드 | 실행되는 스킬 |
-|--------|-------------|
-| 하네스 만들어줘, 하네스 구성, 하네스 설계 | harness |
-| 검증해줘, 확인해봐 | verify |
+| Keyword | Skill |
+|---------|-------|
+| harness, build harness | harness |
+| verify, check | verify |
 
-## 동작 과정
+## Model options
 
-### 1. 키워드 감지
+Each agent's model is chosen during harness build:
 
-사용자가 프롬프트를 입력하면 `UserPromptSubmit` 훅이 한국어/영어 키워드를 감지합니다.
+| Option | Model | Best for |
+|--------|-------|----------|
+| **[O] Opus** | Claude Opus 4.6 | Deep reasoning, analysis, review |
+| **[S] Sonnet** | Claude Sonnet 4.6 | Fast responses, balanced |
+| **[C] Codex** | GPT-5.4 via Codex CLI | Code generation, implementation |
+| **[X] Custom** | Your choice | Any provider/model |
 
-```
-사용자: "하네스 만들어줘"
-  → keyword-detector.mjs가 "하네스" 감지
-  → harness 스킬의 SKILL.md를 Claude 컨텍스트에 주입
-```
-
-### 2. 프로젝트 분석
-
-harness 스킬이 대상 프로젝트를 분석합니다:
-- 기술 스택 (package.json, tsconfig 등)
-- 디렉토리 구조와 기존 패턴
-- NestJS/DDD 프로젝트는 Hexagonal Architecture 자동 감지
-
-### 3. 에이전트 팀 생성
-
-분석 결과를 바탕으로 에이전트 팀을 구축합니다:
-
-```
-Phase 1  코어 6 에이전트 생성 (에이전트별 모델 선택)
-Phase 2  추가 에이전트/스킬 자동 생성 (프로젝트 특성에 따라)
-Phase 3  오케스트레이터 생성 (에이전트 간 협업 워크플로우)
-Phase 4  CLAUDE.md에 하네스 컨텍스트 등록
-```
-
-### 4. 결과물
-
-대상 프로젝트에 다음이 생성됩니다:
-
-```
-my-project/
-├── .claude/
-│   ├── agents/
-│   │   ├── architect.md         # 설계/분석 (opus)
-│   │   ├── test-engineer.md     # TDD 테스트 작성 (codex)
-│   │   ├── executor.md          # 코드 구현 (codex)
-│   │   ├── code-reviewer.md     # 코드 리뷰 (opus)
-│   │   ├── security-reviewer.md # 보안 리뷰 (opus)
-│   │   ├── debugger.md          # 디버깅 (codex)
-│   │   └── ...                  # 프로젝트별 추가 에이전트
-│   └── skills/
-│       └── {orchestrator}/      # 에이전트 팀 오케스트레이터
-│           └── SKILL.md
-└── CLAUDE.md                    # 하네스 컨텍스트 등록
-```
-
-이후 해당 프로젝트에서 작업을 요청하면 오케스트레이터가 에이전트 팀에 작업을 분배합니다.
-
-## 코어 6 에이전트
-
-| Agent | 역할 | 기본 권장 모델 |
-|-------|------|---------------|
-| **architect** | 설계, 아키텍처 분석, DDD/Hex 가이드 | opus (사고/추론) |
-| **test-engineer** | TDD 테스트 작성, 커버리지 | codex (코딩) |
-| **executor** | 코드 구현, 최소 diff | codex (코딩) |
-| **code-reviewer** | 코드 리뷰, SOLID, 품질 | opus (사고/추론) |
-| **security-reviewer** | OWASP Top 10, 시크릿 스캔 | opus (사고/추론) |
-| **debugger** | 루트 원인 분석, 빌드 에러 해결 | codex (코딩) |
-
-**모델 매핑:**
-- **opus** → Claude CLI (`claude-opus-4-6`) — 사고/추론에 강함
-- **codex** → Codex CLI (`codex exec --full-auto`, `gpt-5.4`) — 코딩/구현에 강함
-
-에이전트별 모델은 harness 빌드 시 사용자가 직접 선택합니다.
-
-## 프로젝트 구조
+## Project structure
 
 ```
 oh-my-harness/
 ├── .claude-plugin/
-│   └── plugin.json              # 플러그인 매니페스트
-├── agents/                      # 코어 6 에이전트 템플릿
+│   └── plugin.json              # Plugin manifest
+├── agents/                      # Core 6 agent templates
 │   ├── architect.md
 │   ├── test-engineer.md
 │   ├── executor.md
@@ -163,35 +243,30 @@ oh-my-harness/
 │   ├── security-reviewer.md
 │   └── debugger.md
 ├── skills/
-│   ├── harness/                 # 하네스 빌더 스킬
+│   ├── harness/                 # Harness builder skill
 │   │   ├── SKILL.md
-│   │   └── references/          # 참조 문서
-│   └── verify/                  # 검증 스킬
+│   │   └── references/
+│   └── verify/                  # Verification skill
 │       └── SKILL.md
 ├── hooks/
-│   └── hooks.json               # 키워드 감지 훅 설정
+│   └── hooks.json               # Keyword detection hook
 ├── scripts/
-│   ├── keyword-detector.mjs     # 한/영 키워드 → 스킬 트리거
+│   ├── keyword-detector.mjs     # KR/EN keyword -> skill trigger
 │   └── lib/stdin.mjs
-├── commands/                    # 슬래시 커맨드 정의
+├── commands/
 │   ├── harness.md
 │   ├── verify.md
 │   └── help.md
-├── CLAUDE.md
-└── package.json
+└── CLAUDE.md
 ```
 
-## 참조 프로젝트
+## Credits
 
-이 플러그인은 두 개의 오픈소스 프로젝트에서 핵심 기능을 가져왔습니다.
+Built on ideas from two open-source projects:
 
-- **[oh-my-claudecode](https://github.com/Yeachan-Heo/oh-my-claudecode)**: 6개 코어 에이전트 정의, 키워드 감지 훅 시스템, verify 스킬
-- **[harness](https://github.com/revfactory/harness)**: 하네스 메타스킬, 참조 문서 (에이전트 설계 패턴, 오케스트레이터 템플릿 등)
+- **[oh-my-claudecode](https://github.com/Yeachan-Heo/oh-my-claudecode)** — Core 6 agent definitions, keyword detection hooks, verify skill
+- **[harness](https://github.com/revfactory/harness)** — Harness meta-skill, reference documents (agent design patterns, orchestrator templates)
 
-## Codex 없이 사용
-
-Codex CLI가 설치되어 있지 않아도 동작합니다. codex 모델을 선택한 에이전트는 Claude Sonnet으로 자동 대체됩니다.
-
-## 라이선스
+## License
 
 MIT

@@ -13,11 +13,13 @@
 | security-reviewer | OWASP Top 10, 시크릿 스캔 | opus |
 | debugger | 루트 원인 분석, 빌드 에러 | codex |
 
-에이전트별 모델은 harness 빌드 시 사용자가 선택 (opus/codex).
+에이전트별 모델은 harness 빌드 시 사용자가 선택 (Opus/Sonnet/Codex/Custom).
 
 **모델 매핑:**
-- opus → `provider: claude`, `model: claude-opus-4-6` (Claude CLI)
-- codex → `provider: codex`, `model: gpt-5.4` (Codex CLI: `codex exec --full-auto`)
+- Opus → `provider: claude`, `model: claude-opus-4-6` (깊은 사고·추론)
+- Sonnet → `provider: claude`, `model: claude-sonnet-4-6` (빠른 응답·균형 성능)
+- Codex → `provider: codex`, `model: gpt-5.4` (Codex CLI: `codex exec --full-auto`)
+- Custom → 사용자 지정 provider/model
 
 추가 에이전트 (planner, analyst, critic 등)는 프로젝트 분석 후 harness가 자동 생성.
 

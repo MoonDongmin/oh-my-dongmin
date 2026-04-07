@@ -1,6 +1,7 @@
 ---
 name: harness
 description: "프로젝트에 에이전트 팀을 구축하는 하네스 빌더. 코어 6 에이전트(architect, test-engineer, executor, code-reviewer, security-reviewer, debugger)를 필수 생성하고, 프로젝트 분석 후 추가 에이전트/스킬을 자동 생성한다. (1) '하네스 만들어줘', '하네스 구성해줘', '하네스 구축해줘' 요청 시, (2) '하네스 설계', '하네스 엔지니어링' 요청 시, (3) 새 프로젝트에 에이전트 팀을 세팅할 때, (4) 기존 하네스를 확장하거나 유지보수할 때, (5) 'harness 만들어줘', 'build harness' 등 영문 트리거에도 반응."
+allowed-tools: Read Glob Grep "Bash(git *)" "Bash(ls *)"
 ---
 
 # Harness — Agent Team Builder
@@ -26,16 +27,18 @@ description: "프로젝트에 에이전트 팀을 구축하는 하네스 빌더.
 
 | Agent | 역할 | 기본 권장 모델 |
 |-------|------|---------------|
-| architect | 설계, 아키텍처 분석, DDD/Hex 가이드 | opus (사고/추론) |
-| test-engineer | TDD 테스트 작성, 커버리지 | codex (코딩) |
-| executor | 코드 구현, 최소 diff | codex (코딩) |
-| code-reviewer | 코드 리뷰, SOLID, 품질 | opus (사고/추론) |
-| security-reviewer | OWASP Top 10, 시크릿 스캔 | opus (사고/추론) |
-| debugger | 루트 원인 분석, 빌드 에러 해결 | codex (코딩) |
+| architect | 설계, 아키텍처 분석, DDD/Hex 가이드 | Opus (사고/추론) |
+| test-engineer | TDD 테스트 작성, 커버리지 | Codex (코딩) |
+| executor | 코드 구현, 최소 diff | Codex (코딩) |
+| code-reviewer | 코드 리뷰, SOLID, 품질 | Opus (사고/추론) |
+| security-reviewer | OWASP Top 10, 시크릿 스캔 | Opus (사고/추론) |
+| debugger | 루트 원인 분석, 빌드 에러 해결 | Codex (코딩) |
 
 **모델 매핑:**
-- **opus** → `provider: claude`, `model: claude-opus-4-6` — Claude CLI 사용
-- **codex** → `provider: codex`, `model: gpt-5.4` — Codex CLI 사용 (`codex exec --full-auto`)
+- **Opus** → `provider: claude`, `model: claude-opus-4-6` — 깊은 사고·추론
+- **Sonnet** → `provider: claude`, `model: claude-sonnet-4-6` — 빠른 응답·균형 성능
+- **Codex** → `provider: codex`, `model: gpt-5.4` — 코딩 특화 (`codex exec --full-auto`)
+- **Custom** → 사용자가 직접 provider/model 지정
 
 ---
 
@@ -63,21 +66,42 @@ description: "프로젝트에 에이전트 팀을 구축하는 하네스 빌더.
 
 #### 1-1. 모델 선택 질문
 
-사용자에게 각 에이전트의 모델을 질문한다. 기본 권장값을 제시하되 사용자가 변경할 수 있게 한다.
+에이전트별로 모델을 선택할 수 있도록 AskUserQuestion 도구로 질문한다. 사용자가 에이전트 성격에 맞는 모델을 직접 고를 수 있게 선택지를 제시한다.
+
+**모델 선택지:**
+
+| 선택 | 모델 | provider | model ID | 특성 |
+|------|------|----------|----------|------|
+| **[O] Opus** | Claude Opus 4.6 | claude | claude-opus-4-6 | 깊은 사고·추론·분석 |
+| **[S] Sonnet** | Claude Sonnet 4.6 | claude | claude-sonnet-4-6 | 빠른 응답·균형 잡힌 성능 |
+| **[C] Codex** | GPT-5.4 (Codex CLI) | codex | gpt-5.4 | 코딩 특화·자동 실행 |
+| **[X] Custom** | 사용자 지정 | — | — | 사용자가 직접 provider/model 설명 |
 
 **질문 형식 (AskUserQuestion 도구 사용):**
 ```
-각 에이전트가 사용할 모델을 선택해주세요:
+각 에이전트의 모델을 선택해주세요.
+[O] Opus  [S] Sonnet  [C] Codex  [X] Custom
 
-1. architect: opus (추천) / codex
-2. test-engineer: codex (추천) / opus
-3. executor: codex (추천) / opus
-4. code-reviewer: opus (추천) / codex
-5. security-reviewer: opus (추천) / codex
-6. debugger: codex (추천) / opus
+ #  에이전트             역할                추천
+ 1. architect           설계·아키텍처 분석    [O]
+ 2. test-engineer       TDD 테스트 작성      [C]
+ 3. executor            코드 구현            [C]
+ 4. code-reviewer       코드 리뷰·SOLID      [O]
+ 5. security-reviewer   보안 리뷰            [O]
+ 6. debugger            디버깅·에러 해결      [C]
+
+예시 답변:
+• "추천대로" → 모두 추천 모델 사용
+• "전부 Opus" → 6개 모두 Opus
+• "1O 2C 3C 4S 5O 6C" → 개별 지정
+• "3번은 Custom: Gemini 2.5 Pro 사용" → Custom 설명
 ```
 
-사용자가 "기본값으로" 또는 "추천대로"라고 하면 권장 모델을 그대로 사용한다.
+**사용자 응답 해석 규칙:**
+- "기본값", "추천대로", "기본으로" → 추천 모델 그대로 사용
+- "전부 X" → 6개 모두 해당 모델
+- "N번 X" 또는 "NX" → 해당 에이전트만 변경, 나머지 추천값 유지
+- Custom 선택 시 → 사용자가 추가 설명한 내용을 에이전트 정의의 provider/model 섹션에 반영
 
 #### 1-2. 에이전트 정의 파일 생성
 
@@ -87,7 +111,7 @@ description: "프로젝트에 에이전트 팀을 구축하는 하네스 빌더.
 ---
 description: {역할 한 줄 설명}
 provider: {claude 또는 codex}
-model: {claude-opus-4-6 또는 gpt-5.4}
+model: {claude-opus-4-6 또는 claude-sonnet-4-6 또는 gpt-5.4}
 ---
 
 # {Agent Name}
@@ -100,8 +124,8 @@ model: {claude-opus-4-6 또는 gpt-5.4}
 
 ## 도구 사용
 {사용 가능한 도구와 제한 사항}
-- opus 에이전트: Claude Code의 Read/Grep/Glob 등 사용
-- codex 에이전트: Codex CLI를 통해 코드 작성 (`codex exec --full-auto`)
+- Claude 에이전트 (Opus/Sonnet): Claude Code의 Read/Grep/Glob 등 사용
+- Codex 에이전트: Codex CLI를 통해 코드 작성 (`codex exec --full-auto`)
 
 ## 출력 형식
 {에이전트의 산출물 규격}

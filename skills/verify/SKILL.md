@@ -1,6 +1,7 @@
 ---
 name: verify
 description: "변경사항이 실제로 동작하는지 검증. 'verify', '검증해줘', '확인해봐', '테스트 돌려봐' 요청 시 사용."
+allowed-tools: Read Glob Grep Bash
 ---
 
 # Verify
