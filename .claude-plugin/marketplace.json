@@ -8,7 +8,7 @@
       "name": "oh-my-harness",
       "source": "./",
       "description": "Agent team builder: auto-generate project-specific agent teams with Claude + Codex providers",
-      "version": "0.1.0"
+      "version": "0.2.0"
     }
   ]
 }
